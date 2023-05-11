@@ -1,20 +1,15 @@
 #!/usr/bin/env bash
 #SBATCH --account civil-459-2023
+#SBATCH --reservation civil-459
 #SBTACH --partition gpu
 #SBATCH --gres gpu:2
-#SBATCH --time 24:00:00
+#SBATCH --time 2:00:00
 #SBATCH --job-name mtr
 #SBATCH --output mtr.out
 #SBATCH --error mtr.err
 
-module purge 
-module load gcc python/3.7.7 cuda/11.6.2
-source ~/venvs/MTR/bin/activate
-
 set -x
 NGPUS=$1
-PY_ARGS=${@:2}
-
 
 while true
 do
@@ -26,7 +21,7 @@ do
 done
 echo $PORT
 
-python -m torch.distributed.launch --nproc_per_node=${NGPUS} --rdzv_endpoint=localhost:${PORT} train.py --launcher pytorch ${PY_ARGS}
-
-# torchrun --nproc_per_node=${NGPUS} --rdzv_endpoint=localhost:${PORT} train.py --launcher pytorch ${PY_ARGS}
-
+module purge 
+module load git gcc python/3.7.7 cuda/11.6.2
+source $HOME/venvs/MTR/bin/activate
+torchrun --nproc_per_node=$NGPUS --rdzv_endpoint=localhost:${PORT} MTR/tools/train.py --launcher pytorch --cfg_file MTR/tools/cfgs/waymo/mtr_weak.yaml --extra_tag my_first_exp
