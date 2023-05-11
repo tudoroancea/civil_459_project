@@ -48,7 +48,7 @@ def parse_config():
     parser.add_argument('--max_waiting_mins', type=int, default=0, help='max waiting minutes')
     parser.add_argument('--start_epoch', type=int, default=0, help='')
     parser.add_argument('--save_to_file', action='store_true', default=False, help='')
-    parser.add_argument('--not_eval_with_train', action='store_true', default=False, help='')
+    parser.add_argument('--not_eval_with_train', action='store_true', default=True, help='')
     parser.add_argument('--logger_iter_interval', type=int, default=50, help='')
     parser.add_argument('--ckpt_save_time_interval', type=int, default=300, help='in terms of seconds')
 
