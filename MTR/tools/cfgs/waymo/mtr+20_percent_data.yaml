@@ -2,7 +2,7 @@ DATA_CONFIG:
     DATASET: WaymoDataset
     OBJECT_TYPE: &object_type ['TYPE_VEHICLE', 'TYPE_PEDESTRIAN', 'TYPE_CYCLIST']
     
-    DATA_ROOT: 'data/waymo'
+    DATA_ROOT: '/work/scitas-share/datasets/Vita/civil-459/waymo110/MTR_preprocessed_data'
     SPLIT_DIR: {
         'train': 'processed_scenarios_training', 
         'test': 'processed_scenarios_validation'
@@ -78,6 +78,8 @@ MODEL:
         }
 
         NMS_DIST_THRESH: 2.5
+
+        USE_DYNAMIC_QUERIES: True
 
 
 OPTIMIZATION:

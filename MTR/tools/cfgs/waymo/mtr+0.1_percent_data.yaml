@@ -15,7 +15,7 @@ DATA_CONFIG:
 
     SAMPLE_INTERVAL: {
         'train': 1000, 
-        'test': 1000
+        'test': 100,
     }
 
     INFO_FILTER_DICT: 
@@ -78,6 +78,8 @@ MODEL:
         }
 
         NMS_DIST_THRESH: 2.5
+
+        USE_DYNAMIC_QUERIES: False
 
 
 OPTIMIZATION:

@@ -216,7 +216,10 @@ class MTRDecoder(nn.Module):
             query_embed = query_embed_pre_mlp(query_embed)
 
         num_q, batch_size, d_model = query_content.shape
-        searching_query = position_encoding_utils.gen_sineembed_for_position(dynamic_query_center, hidden_dim=d_model)
+        if dynamic_query_center is not None:
+            searching_query = position_encoding_utils.gen_sineembed_for_position(dynamic_query_center, hidden_dim=d_model)
+        else:
+            searching_query = None
         kv_pos = kv_pos.permute(1, 0, 2)[:, :, 0:2]
         kv_pos_embed = position_encoding_utils.gen_sineembed_for_position(kv_pos, hidden_dim=d_model)
 
@@ -303,7 +306,11 @@ class MTRDecoder(nn.Module):
 
         base_map_idxs = None
         pred_waypoints = intention_points.permute(1, 0, 2)[:, :, None, :]  # (num_center_objects, num_query, 1, 2)
-        dynamic_query_center = intention_points
+        
+        if self.model_cfg.USE_DYNAMIC_QUERIES:
+            dynamic_query_center = intention_points
+        else:
+            dynamic_query_center = None
 
         pred_list = []
         for layer_idx in range(self.num_decoder_layers):
@@ -358,7 +365,8 @@ class MTRDecoder(nn.Module):
 
             # update
             pred_waypoints = pred_trajs[:, :, :, 0:2]
-            dynamic_query_center = pred_trajs[:, :, -1, 0:2].contiguous().permute(1, 0, 2)  # (num_query, num_center_objects, 2)
+            if self.model_cfg.USE_DYNAMIC_QUERIES:
+                dynamic_query_center = pred_trajs[:, :, -1, 0:2].contiguous().permute(1, 0, 2)  # (num_query, num_center_objects, 2)
 
         if self.use_place_holder:
             raise NotImplementedError
