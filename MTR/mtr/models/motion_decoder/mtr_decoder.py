@@ -105,7 +105,8 @@ class MTRDecoder(nn.Module):
         decoder_layer = transformer_decoder_layer.TransformerDecoderLayer(
             d_model=d_model, nhead=nhead, dim_feedforward=d_model * 4, dropout=dropout,
             activation="relu", normalize_before=False, keep_query_pos=False,
-            rm_self_attn_decoder=False, use_local_attn=use_local_attn
+            rm_self_attn_decoder=False, use_local_attn=use_local_attn,
+            use_dynamic_queries=self.model_cfg.USE_DYNAMIC_QUERIES,
         )
         decoder_layers = nn.ModuleList([copy.deepcopy(decoder_layer) for _ in range(num_decoder_layers)])
         return in_proj_layer, decoder_layers
@@ -216,10 +217,12 @@ class MTRDecoder(nn.Module):
             query_embed = query_embed_pre_mlp(query_embed)
 
         num_q, batch_size, d_model = query_content.shape
-        if dynamic_query_center is not None:
+        if self.model_cfg.USE_DYNAMIC_QUERIES:
+            assert dynamic_query_center is not None
             searching_query = position_encoding_utils.gen_sineembed_for_position(dynamic_query_center, hidden_dim=d_model)
         else:
             searching_query = None
+
         kv_pos = kv_pos.permute(1, 0, 2)[:, :, 0:2]
         kv_pos_embed = position_encoding_utils.gen_sineembed_for_position(kv_pos, hidden_dim=d_model)
 

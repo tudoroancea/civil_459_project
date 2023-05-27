@@ -8,6 +8,7 @@
 Modified from https://github.com/IDEA-opensource/DAB-DETR/blob/main/models/DAB_DETR/transformer.py
 """
 
+from math import e
 from typing import Optional, List
 
 import torch
@@ -30,6 +31,7 @@ class TransformerDecoderLayer(nn.Module):
         keep_query_pos=False,
         rm_self_attn_decoder=False,
         use_local_attn=False,
+        use_dynamic_queries=True,
     ):
         super().__init__()
         # Decoder Self-Attention
@@ -55,14 +57,23 @@ class TransformerDecoderLayer(nn.Module):
         self.ca_qpos_sine_proj = nn.Linear(d_model, d_model)
 
         self.use_local_attn = use_local_attn
+        self.use_dynamic_queries = use_dynamic_queries
 
         if self.use_local_attn:
             self.cross_attn = MultiheadAttentionLocal(
-                d_model * 2, nhead, dropout=dropout, vdim=d_model, without_weight=True
+                d_model * (2 if use_dynamic_queries else 1),
+                nhead,
+                dropout=dropout,
+                vdim=d_model,
+                without_weight=True,
             )
         else:
             self.cross_attn = MultiheadAttention(
-                d_model * 2, nhead, dropout=dropout, vdim=d_model, without_weight=True
+                d_model * (2 if use_dynamic_queries else 1),
+                nhead,
+                dropout=dropout,
+                vdim=d_model,
+                without_weight=True,
             )
 
         self.nhead = nhead
@@ -115,6 +126,9 @@ class TransformerDecoderLayer(nn.Module):
         Returns:
             _type_: _description_
         """
+        if self.use_dynamic_queries:
+            assert query_sine_embed is not None
+
         num_queries, bs, n_model = tgt.shape
         # ========== Begin of Self-Attention =============
         if not self.rm_self_attn_decoder:
@@ -150,8 +164,10 @@ class TransformerDecoderLayer(nn.Module):
             query_pos = (
                 query_pos.permute(1, 0, 2).contiguous().view(-1, n_model)
             )  # (B * num_q, C)
-            if query_sine_embed is not None:
-                query_sine_embed = query_sine_embed.permute(1, 0, 2).contiguous().view(-1, n_model)  # (B * num_q, C)
+            if self.use_dynamic_queries:
+                query_sine_embed = (
+                    query_sine_embed.permute(1, 0, 2).contiguous().view(-1, n_model)
+                )  # (B * num_q, C)
             tgt = tgt.permute(1, 0, 2).contiguous().view(-1, n_model)  # (B * num_q, C)
 
         # ========== Begin of Cross-Attention =============
@@ -189,23 +205,27 @@ class TransformerDecoderLayer(nn.Module):
             q = q_content
             k = k_content
 
-        if query_sine_embed is not None:
+        if self.use_dynamic_queries:
             query_sine_embed = self.ca_qpos_sine_proj(query_sine_embed)
 
         if self.use_local_attn:
             num_q_all, n_model = q_content.shape
             num_k_all, _ = k_content.shape
 
-            q = q.view(num_q_all, self.nhead, n_model//self.nhead)
-            if query_sine_embed is not None:
-                query_sine_embed = query_sine_embed.view(num_q_all, self.nhead, n_model//self.nhead)
-                q = torch.cat([q, query_sine_embed], dim=-1).view(num_q_all, n_model * 2)
+            if self.use_dynamic_queries:
+                q = q.view(num_q_all, self.nhead, n_model // self.nhead)
+                query_sine_embed = query_sine_embed.view(
+                    num_q_all, self.nhead, n_model // self.nhead
+                )
+                q = torch.cat([q, query_sine_embed], dim=-1).view(
+                    num_q_all, n_model * 2
+                )
+                k = k.view(num_k_all, self.nhead, n_model // self.nhead)
+                k_pos = k_pos.view(num_k_all, self.nhead, n_model // self.nhead)
+                k = torch.cat([k, k_pos], dim=-1).view(num_k_all, n_model * 2)
             else:
-                q = torch.cat([q, q], dim=-1).view(num_q_all, n_model * 2)
-
-            k = k.view(num_k_all, self.nhead, n_model // self.nhead)
-            k_pos = k_pos.view(num_k_all, self.nhead, n_model // self.nhead)
-            k = torch.cat([k, k_pos], dim=-1).view(num_k_all, n_model * 2)
+                q = q.view(num_q_all, n_model)
+                k = k.view(num_k_all, n_model)
 
             assert num_q_all == len(index_pair)
 
@@ -225,15 +245,20 @@ class TransformerDecoderLayer(nn.Module):
             hw, _, _ = k_content.shape
 
             q = q.view(num_queries, bs, self.nhead, n_model // self.nhead)
-            if query_sine_embed is not None:
-                query_sine_embed = query_sine_embed.view(num_queries, bs, self.nhead, n_model//self.nhead)
-                q = torch.cat([q, query_sine_embed], dim=3).view(num_queries, bs, n_model * 2)
-            else: 
-                q = torch.cat([q, q], dim=3).view(num_queries, bs, n_model * 2)
+            if self.use_dynamic_queries:
+                query_sine_embed = query_sine_embed.view(
+                    num_queries, bs, self.nhead, n_model // self.nhead
+                )
+                q = torch.cat([q, query_sine_embed], dim=3).view(
+                    num_queries, bs, n_model * 2
+                )
+                k = k.view(hw, bs, self.nhead, n_model // self.nhead)
+                k_pos = k_pos.view(hw, bs, self.nhead, n_model // self.nhead)
+                k = torch.cat([k, k_pos], dim=3).view(hw, bs, n_model * 2)
 
-            k = k.view(hw, bs, self.nhead, n_model // self.nhead)
-            k_pos = k_pos.view(hw, bs, self.nhead, n_model // self.nhead)
-            k = torch.cat([k, k_pos], dim=3).view(hw, bs, n_model * 2)
+            else:
+                q = q.view(num_queries, bs, n_model)
+                k = k.view(hw, bs, n_model)
 
             tgt2 = self.cross_attn(
                 query=q,

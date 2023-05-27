@@ -48,7 +48,7 @@ def parse_config():
     parser.add_argument('--max_waiting_mins', type=int, default=0, help='max waiting minutes')
     parser.add_argument('--start_epoch', type=int, default=0, help='')
     parser.add_argument('--save_to_file', action='store_true', default=False, help='')
-    parser.add_argument('--not_eval_with_train', action='store_true', default=True, help='')
+    parser.add_argument('--eval_with_train', action='store_true', default=False, help='')
     parser.add_argument('--logger_iter_interval', type=int, default=50, help='')
     parser.add_argument('--ckpt_save_time_interval', type=int, default=300, help='in terms of seconds')
 
@@ -245,7 +245,7 @@ def main():
         scheduler=scheduler,
         logger=logger,
         eval_output_dir=eval_output_dir,
-        test_loader=test_loader if not args.not_eval_with_train else None,
+        test_loader=test_loader if args.eval_with_train else None,
         cfg=cfg, dist_train=dist_train, logger_iter_interval=args.logger_iter_interval,
         ckpt_save_time_interval=args.ckpt_save_time_interval
     )
@@ -254,29 +254,30 @@ def main():
                 % (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
 
 
-    logger.info('**********************Start evaluation %s/%s(%s)**********************' %
-                (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
+    if args.eval_with_train: 
+        logger.info('**********************Start evaluation %s/%s(%s)**********************' %
+                    (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
 
-    eval_output_dir = output_dir / 'eval' / 'eval_with_train'
-    eval_output_dir.mkdir(parents=True, exist_ok=True)
-    args.start_epoch = max(args.epochs - 0, 0)  # Only evaluate the last 10 epochs
-    cfg.DATA_CONFIG.SAMPLE_INTERVAL.val = 1
+        eval_output_dir = output_dir / 'eval' / 'eval_with_train'
+        eval_output_dir.mkdir(parents=True, exist_ok=True)
+        args.start_epoch = max(args.epochs - 0, 0)  # Only evaluate the last 10 epochs
+        cfg.DATA_CONFIG.SAMPLE_INTERVAL.val = 1
 
-    test_set, test_loader, sampler = build_dataloader(
-        dataset_cfg=cfg.DATA_CONFIG,
-        batch_size=args.batch_size,
-        dist=dist_train, workers=args.workers, logger=logger, training=False
-    )
+        test_set, test_loader, sampler = build_dataloader(
+            dataset_cfg=cfg.DATA_CONFIG,
+            batch_size=args.batch_size,
+            dist=dist_train, workers=args.workers, logger=logger, training=False
+        )
 
-    from test import repeat_eval_ckpt, eval_single_ckpt
-    repeat_eval_ckpt(
-        model.module if dist_train else model,
-        test_loader, args, eval_output_dir, logger, ckpt_dir,
-        dist_test=dist_train
-    )
+        from test import repeat_eval_ckpt, eval_single_ckpt
+        repeat_eval_ckpt(
+            model.module if dist_train else model,
+            test_loader, args, eval_output_dir, logger, ckpt_dir,
+            dist_test=dist_train
+        )
 
-    logger.info('**********************End evaluation %s/%s(%s)**********************' %
-                (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
+        logger.info('**********************End evaluation %s/%s(%s)**********************' %
+                    (cfg.EXP_GROUP_PATH, cfg.TAG, args.extra_tag))
 
 
 if __name__ == '__main__':

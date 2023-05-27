@@ -59,10 +59,10 @@ def parse_config():
     return args, cfg
 
 
-def eval_single_ckpt(model, test_loader, args, eval_output_dir, logger, epoch_id, dist_test=False):
+def eval_single_ckpt(model: model_utils.MotionTransformer, test_loader, args, eval_output_dir, logger, epoch_id, dist_test=False):
     # load checkpoint
     if args.ckpt is not None: 
-        it, epoch = model.load_params_from_file(filename=args.ckpt, logger=logger, to_cpu=dist_test)
+        it, epoch = model.load_params_from_file(filename=args.ckpt, logger=logger, to_cpu=False)
     else:
         it, epoch = -1, -1
     model.cuda()
@@ -149,10 +149,14 @@ def main():
         dist_test = False
         total_gpus = 1
     else:
+        if args.local_rank is None:
+            args.local_rank = int(os.environ.get('LOCAL_RANK', '0'))
         total_gpus, cfg.LOCAL_RANK = getattr(common_utils, 'init_dist_%s' % args.launcher)(
             args.tcp_port, args.local_rank, backend='nccl'
         )
         dist_test = True
+    
+    print(f"total_gpus: {total_gpus}, dist_test: {dist_test}")
 
     if args.batch_size is None:
         args.batch_size = cfg.OPTIMIZATION.BATCH_SIZE_PER_GPU
@@ -202,11 +206,18 @@ def main():
         dist=dist_test, workers=args.workers, logger=logger, training=False
     )
     model = model_utils.MotionTransformer(config=cfg.MODEL)
+    # if args.ckpt is not None: 
+    #     print('load model from %s ...' % args.ckpt)
+    #     model.load_params_from_file(filename=args.ckpt, logger=logger, to_cpu=dist_test)
+    model.cuda()
+    if dist_test:
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[cfg.LOCAL_RANK % torch.cuda.device_count()], find_unused_parameters=True)
+
     with torch.no_grad():
         if args.eval_all:
-            repeat_eval_ckpt(model, test_loader, args, eval_output_dir, logger, ckpt_dir, dist_test=dist_test)
+            repeat_eval_ckpt(model.module if dist_test else model, test_loader, args, eval_output_dir, logger, ckpt_dir, dist_test=dist_test)
         else:
-            eval_single_ckpt(model, test_loader, args, eval_output_dir, logger, epoch_id, dist_test=dist_test)
+            eval_single_ckpt(model.module if dist_test else model, test_loader, args, eval_output_dir, logger, epoch_id, dist_test=dist_test)
 
 
 if __name__ == '__main__':
