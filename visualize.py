@@ -2,6 +2,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.animation import FuncAnimation
 import sys
 
 sys.path.append("MTR/mtr/datasets/waymo/")
@@ -15,6 +16,74 @@ from waymo_types import polyline_type
 
 # file = "../data/processed_scenarios_training/sample_2c25255b942748dc.pkl"
 file = "../data/processed_scenarios_training/sample_867dd000677d389.pkl"
+# file = "../data/processed_scenarios_training/sample_867dd000677d389.pkl"
+
+
+def plot_frame(ax, data, frame):
+    # load the trajectories
+    # trajs : x, y, z, length, width, height, heading, velocity_x, velocity_y, valid
+    type = data["track_infos"]["object_type"]
+    trajs = data["track_infos"]["trajs"]
+
+
+    for i in range(len(type)):
+        # remove 0,0 points from the trajectories
+        zeros = np.where(trajs[i, :, 0] == 0)[0]
+        first_zero = trajs.shape[1]
+        if len(zeros) > 0:
+            first_zero = np.where(trajs[i, :, 0] == 0)[0][0]        
+        # print(first_zero)
+        index = min(frame, first_zero-1)
+        if (index >= 0):
+            angle = trajs[i, index, 6]
+            if type[i] == "TYPE_VEHICLE":
+                # plot a rectangle at the first position of the trajectory and rotate it
+                rect = Rectangle((trajs[i, index, 0] - 1, trajs[i, index, 1]-2), 2, 4, angle=90 + angle*180/np.pi, color='blue', rotation_point='center')
+                ax.add_patch(rect)
+            elif type[i] == "TYPE_PEDESTRIAN":
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.25), 1, 1, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
+                ax.add_patch(rect)
+            elif type[i] == "TYPE_CYCLIST":
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.5), 1, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
+                ax.add_patch(rect)
+
+            ax.scatter(trajs[i, :first_zero, 0], trajs[i, :first_zero, 1], color='red', s=0.1, alpha=0.5)
+
+    for a in data["map_infos"]["road_line"]:
+        color = 'black'
+        linestyle = 'solid'
+        if a["type"] == "TYPE_BROKEN_SINGLE_WHITE":
+            color = 'gray'
+            linestyle = 'dashed'
+        elif a["type"] == "TYPE_SOLID_SINGLE_WHITE" or a["type"] == "TYPE_SOLID_DOUBLE_WHITE":
+            color = 'gray'
+        elif a["type"] == "TYPE_SOLID_SINGLE_YELLOW" or a["type"] == "TYPE_SOLID_DOUBLE_YELLOW":
+            color = 'yellow'
+        elif a["type"] == "TYPE_BROKEN_SINGLE_YELLOW" or a["type"] == "TYPE_BROKEN_DOUBLE_YELLOW" or a["type"] == "TYPE_PASSING_DOUBLE_YELLOW":
+            color = 'yellow'
+            linestyle = 'dashed'
+
+        indices = a["polyline_index"]
+        road_line_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
+        ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1], color=color, linestyle=linestyle, linewidth=0.2)
+
+    for a in data["map_infos"]["road_edge"]:
+        color = 'black'
+        if a["type"] == "TYPE_ROAD_EDGE_MEDIAN":
+            color = 'gray'
+        indices = a["polyline_index"]
+        road_edge_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
+        ax.plot(road_edge_polylines[:, 0], road_edge_polylines[:, 1], color=color, linewidth=0.2)
+
+
+    # load the road lane
+    for a in data["map_infos"]["lane"]:
+        indices = a["polyline_index"]
+        road_line_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
+        ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1], color='lightgray', linewidth=0.2)
+
+    ax.set_aspect('equal')
+    ax.set_box_aspect(1)
 
 with open(file, 'rb') as f:
     data = pickle.load(f)
@@ -27,66 +96,18 @@ with open(file, 'rb') as f:
 
     fig, ax = plt.subplots()
 
-    for a in data["map_infos"]["road_line"]:
-        color = 'black'
-        linestyle = 'solid'
-        if a["type"] == "TYPE_BROKEN_SINGLE_WHITE":
-            color = 'lightgray'
-            linestyle = 'dashed'
-        elif a["type"] == "TYPE_SOLID_SINGLE_WHITE" or a["type"] == "TYPE_SOLID_DOUBLE_WHITE":
-            color = 'lightgray'
-        elif a["type"] == "TYPE_SOLID_SINGLE_YELLOW" or a["type"] == "TYPE_SOLID_DOUBLE_YELLOW":
-            color = 'yellow'
-        elif a["type"] == "TYPE_BROKEN_SINGLE_YELLOW" or a["type"] == "TYPE_BROKEN_DOUBLE_YELLOW" or a["type"] == "TYPE_PASSING_DOUBLE_YELLOW":
-            color = 'yellow'
-            linestyle = 'dashed'
+    def animate_func(j):
+        ax.clear()
+        plot_frame(ax, data, j)
 
-        indices = a["polyline_index"]
-        road_line_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
-        ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1], color=color, linestyle=linestyle)
-
-    for a in data["map_infos"]["road_edge"]:
-        color = 'black'
-        if a["type"] == "TYPE_ROAD_EDGE_MEDIAN":
-            color = 'gray'
-        indices = a["polyline_index"]
-        road_edge_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
-        ax.plot(road_edge_polylines[:, 0], road_edge_polylines[:, 1], color=color)
-
-
-    # load the road lane
-    for a in data["map_infos"]["lane"]:
-        indices = a["polyline_index"]
-        road_line_polylines = data["map_infos"]["all_polylines"][indices[0]:indices[1]]
-        ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1], color='gray')
-
-    print(data["map_infos"]["lane"])
-    print(road_line_polylines[0])
-    # plot the polylines
+    # animate the trajectories with rectangles    
+    # the animation should last 8 seconds 
+    interval = 1000/(data["track_infos"]["trajs"].shape[1] / 8)
+    anim = FuncAnimation(fig, animate_func, frames=range(0, data["track_infos"]["trajs"].shape[1]), interval=interval)
     
-    # ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1])
 
-
-    # load the trajectories
-    # trajs : x, y, z, length, width, height, heading, velocity_x, velocity_y, valid
-    type = data["track_infos"]["object_type"]
-    trajs = data["track_infos"]["trajs"]
-    print(trajs.shape)
-    for i in range(len(type)):
-        print(type[i])
-        angle = trajs[i, 0, 6]
-        if type[i] == "TYPE_VEHICLE":
-            # plot a rectangle at the first position of the trajectory and rotate it
-            rect = Rectangle((trajs[i, 0, 0] - 1, trajs[i, 0, 1]-2), 2, 4, angle=90 + angle*180/np.pi, color='blue', rotation_point='center')
-            ax.add_patch(rect)
-        elif type[i] == "TYPE_PEDESTRIAN":
-            rect = Rectangle((trajs[i, 0, 0] - 0.25, trajs[i, 0, 1]-0.25), 1, 1, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
-            ax.add_patch(rect)
-        elif type[i] == "TYPE_CYCLIST":
-            rect = Rectangle((trajs[i, 0, 0] - 0.25, trajs[i, 0, 1]-0.5), 1, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
-            ax.add_patch(rect)
-        ax.scatter(trajs[i, :, 0], trajs[i, :, 1], color='red', s=0.5)
-
-    ax.set_aspect('equal')
-    ax.set_box_aspect(1)    
-    plt.show()
+    # play the animation
+    anim.save('animation.gif', writer='pillow', fps=30, dpi=750)
+    
+    # plot_frame(ax, data, 0)
+    # plt.show()
