@@ -1,0 +1,10 @@
+numpy
+torch==1.13.1
+tensorboardX
+easydict
+pyyaml
+scikit-image
+tqdm
+tensorflow==2.11.0
+tensorrt==8.6.1
+waymo-open-dataset-tf-2-3-0
