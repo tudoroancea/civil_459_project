@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.animation import FuncAnimation
+from matplotlib.lines import Line2D
 import sys
 
 sys.path.append("MTR/mtr/datasets/waymo/")
@@ -26,35 +27,6 @@ file = path + filename
 
 
 def plot_frame(ax, data, frame):
-    # load the trajectories
-    # trajs : x, y, z, length, width, height, heading, velocity_x, velocity_y, valid
-    type = data["track_infos"]["object_type"]
-    trajs = data["track_infos"]["trajs"]
-
-
-    for i in range(len(type)):
-        # remove 0,0 points from the trajectories
-        zeros = np.where(trajs[i, :, 0] == 0)[0]
-        first_zero = trajs.shape[1]
-        if len(zeros) > 0:
-            first_zero = np.where(trajs[i, :, 0] == 0)[0][0]        
-        # print(first_zero)
-        index = min(frame, first_zero-1)
-        if (index >= 0):
-            angle = trajs[i, index, 6]
-            if type[i] == "TYPE_VEHICLE":
-                # plot a rectangle at the first position of the trajectory and rotate it
-                rect = Rectangle((trajs[i, index, 0] - 1, trajs[i, index, 1]-2), 2, 4, angle=90 + angle*180/np.pi, color='blue', rotation_point='center')
-                ax.add_patch(rect)
-            elif type[i] == "TYPE_PEDESTRIAN":
-                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.25), 1, 1, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
-                ax.add_patch(rect)
-            elif type[i] == "TYPE_CYCLIST":
-                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.5), 1, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
-                ax.add_patch(rect)
-
-            ax.scatter(trajs[i, :first_zero, 0], trajs[i, :first_zero, 1], color='red', s=0.1, alpha=0.5)
-
     for a in data["map_infos"]["road_line"]:
         color = 'black'
         linestyle = 'solid'
@@ -89,6 +61,48 @@ def plot_frame(ax, data, frame):
         ax.plot(road_line_polylines[:, 0], road_line_polylines[:, 1], color='lightgray', linewidth=0.2)
 
 
+    # load the trajectories
+    # trajs : x, y, z, length, width, height, heading, velocity_x, velocity_y, valid
+    type = data["track_infos"]["object_type"]
+    trajs = data["track_infos"]["trajs"]
+    # print(data)
+
+
+    for i in range(len(type)):
+        # remove 0,0 points from the trajectories
+        color = 'blue'
+        if (i in data["tracks_to_predict"]["track_index"]):
+            color = 'red'
+        zeros = np.where(trajs[i, :, 0] == 0)[0]
+        first_zero = trajs.shape[1]
+        if len(zeros) > 0:
+            first_zero = np.where(trajs[i, :, 0] == 0)[0][0]        
+        # print(first_zero)
+        index = min(frame, first_zero-1)
+        if (index >= 0):
+            angle = trajs[i, index, 6]
+            if type[i] == "TYPE_VEHICLE":
+                # plot a rectangle at the first position of the trajectory and rotate it
+                rect = Rectangle((trajs[i, index, 0] - 1, trajs[i, index, 1]-2), 2, 4, angle=90 + angle*180/np.pi, color=color, rotation_point='center', zorder=2)
+                ax.add_patch(rect)
+            elif type[i] == "TYPE_PEDESTRIAN":
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.25), 1, 1, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
+                ax.add_patch(rect)
+            elif type[i] == "TYPE_CYCLIST":
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.5), 1, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
+                ax.add_patch(rect)
+
+            c = np.linspace(0.2, 1.0, first_zero)
+            ax.scatter(trajs[i, :first_zero, 0], trajs[i, :first_zero, 1], color="red", s = 0.01, alpha=0.9, zorder=2)
+
+    # build the legend
+    legend_elements = [Line2D([0], [0], color='gray', lw=2, label='white Road lines'),
+                        Line2D([0], [0], color='yellow', lw=2, label='yellow Road lines'),
+                        Line2D([0], [0], color='black', lw=2, label='Road edges'),
+                        Line2D([0], [0], color='lightgray', lw=2, label='Lanes'),]
+    return legend_elements
+                                   
+
 def get_prediction():
     return apply(filename)
 
@@ -97,7 +111,11 @@ def add_prediction_to_plot(ax, pred):
         trajs = i["pred_trajs"]
         num_trajs = trajs.shape[0]
         for j in range(num_trajs):
-            plt.scatter(trajs[j, :, 0], trajs[j, :, 1], color='green', s=0.1, alpha=i["pred_scores"][j])
+            alpha = i["pred_scores"][j] # range : 0 to 1
+            plt.scatter(trajs[j, :, 0], trajs[j, :, 1], color="green", s=0.1, alpha=alpha, zorder=2, label="Prediction")
+
+    # add the gradient green as cmap
+
 
 with open(file, 'rb') as f:
     data = pickle.load(f)
@@ -112,20 +130,30 @@ with open(file, 'rb') as f:
 
     pred = get_prediction()
 
+    cmap = plt.cm.Greens
+    norm = plt.Normalize(vmin=0, vmax=1)
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax)
+    cbar.set_label('Prediction score')
+
     def animate_func(j):
         ax.clear()
-        plot_frame(ax, data, j)
+        legends = plot_frame(ax, data, j)
         add_prediction_to_plot(ax, pred)
+        ax.legend(handles=legends, loc='upper right', bbox_to_anchor=(0.9, 0.9, 0.1, 0.1), fontsize='xx-small')
 
     # animate the trajectories with rectangles    
     # the animation should last 8 seconds 
     interval = 1000/(data["track_infos"]["trajs"].shape[1] / 8)
     anim = FuncAnimation(fig, animate_func, frames=range(0, data["track_infos"]["trajs"].shape[1]), interval=interval)
-    
+    # plot_frame(ax, data, 0)   
+    # add_prediction_to_plot(ax, pred) 
     ax.set_aspect('equal')
     ax.set_box_aspect(1)
+  
     # play the animation
     anim.save('animation.gif', writer='pillow', fps=30, dpi=750)
     
-    # plot_frame(ax, data, 0)
+
     # plt.show()
