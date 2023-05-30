@@ -4,7 +4,7 @@
 #SBTACH --partition gpu
 #SBATCH --gres gpu:2
 #SBATCH --mem 64G   
-#SBATCH --time 10:00:00
+#SBATCH --time 2:00:00
 #SBATCH --job-name mtr
 #SBATCH --output mtr.out
 #SBATCH --error mtr.err
