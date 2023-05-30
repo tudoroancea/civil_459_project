@@ -27,6 +27,15 @@ with only 2 Nvidia V100 GPUS), we only trained on 20% of the data for only 15 ep
 > The original authors trained on 100% of the data for 30 epochs with 8 RTX 8000 GPUs.
 
 In our experiments we tried to demonstrate the effect of the presence of the dynamic query pairs.
+As seen in the table below, the average performance is marginally but still better 
+with the dynamic queries.
+
+![results](images/results.png)
+
+On the visualization below we can see that without dynamic queries, the model tends to
+predict trajectories that do not properly follow the road or even leave it.
+
+![vis](images/vis.gif)
 
 ## Usage
 > Remark: The following section describes the usage on the Izar cluster. 
@@ -58,7 +67,15 @@ pip3 install -e MTR
 
 ### Project structure
 
-The [MTR](MTR) folder contains the code of [the repo](https://github.com/sshaoshuai/MTR).
+1. The [MTR](MTR) folder contains the code of [the original repo](https://github.com/sshaoshuai/MTR).
+   The train and test python scripts can be found in [MTR/tools](MTR/tools). 
+   The configuration files (the original ones and the ones we created for this project)
+   can be found in [MTR/tools/cfgs/waymo](MTR/tools/cfgs/waymo/).
+   The model definition can be found in [MTR/mtr/models](MTR/mtr/models).
+2. We have added the following scripts:
+   - [train.sh](train.sh) and [test.sh](test.sh) to train and test the models on Izar.
+   - [visualize.py](visualize.py) to visualize the predictions of a trained model.
+
 
 ### Training and testing
 
@@ -80,3 +97,11 @@ sbatch test.sh
 > roughly 45h, or just under 2 days.
 
 ### Visualization
+
+To launch the visualization script on you can use:
+```bash
+python3 visualize.py --cfg_file MTR/tools/cfgs/waymo/dlav_with_dynamic_queries.yaml
+```
+You may have to modify in the script:
+- the path to the model
+- the filename of the scene to visualize
