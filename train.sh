@@ -3,6 +3,7 @@
 ##SBATCH --reservation civil-459
 #SBTACH --partition gpu
 #SBATCH --gres gpu:2
+#SBATCH --cpus-per-task 20
 #SBATCH --mem 64G   
 #SBATCH --time 15:00:00
 #SBATCH --job-name mtr
