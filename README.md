@@ -47,7 +47,7 @@ predict trajectories that do not properly follow the road or even leave it.
 The project requirements are defined in the [`requirements.txt`](requirements.txt) file and comprise 
 [pytorch](https://pytorch.org/) for training and [tensorflow](https://www.tensorflow.org/) for evaluation 
 (using waymo's official evaluation packages).
-In this project we assume a virutal environment called `MTR` was created with `venv` in the  `~/venvs` directory.
+In this project we assume a virtual environment called `MTR` was created with `venv` in the  `~/venvs` directory.
 The MTR code uses custom CUDA extensions, so they have to be built by installing MTR as a package.
 
 You can find below instructions to setup eveything on Izar:
