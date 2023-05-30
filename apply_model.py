@@ -18,7 +18,7 @@ checkpoint_path = "../checkpoint_epoch_1.pth"
 data_path = "../data"
 data_filename = "sample_867dd000677d389.pkl"
 
-def load_model():
+def load_model(checkpoint_path=checkpoint_path):
     # checkpoint = torch.load(checkpoint_path)
     args, cfg = parse_config()
     logger = common_utils.create_logger("log.txt", rank=cfg.LOCAL_RANK)  # create logger
@@ -65,8 +65,8 @@ def apply_model(model_):
         final_pred_dicts = dataset.generate_prediction_dicts(batch_pred_dicts, output_path=None)
     return final_pred_dicts
 
-def apply(data_filename=data_filename):
-    model_ = load_model().cuda()
+def apply(data_filename=data_filename, checkpoint_path=checkpoint_path):
+    model_ = load_model(checkpoint_path=checkpoint_path).cuda()
     create_pickle(data_filename)
     result = apply_model(model_)
     return result

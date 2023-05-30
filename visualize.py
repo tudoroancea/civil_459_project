@@ -21,7 +21,8 @@ from apply_model import apply
 
 # file = "../data/processed_scenarios_training/sample_2c25255b942748dc.pkl"
 path = "../data/processed_scenarios_training/"
-filename = "sample_867dd000677d389.pkl"
+init_filename = "sample_867dd000677d389.pkl"
+filename = init_filename
 file = path + filename
 # file = "../data/processed_scenarios_training/sample_867dd000677d389.pkl"
 
@@ -86,10 +87,10 @@ def plot_frame(ax, data, frame):
                 rect = Rectangle((trajs[i, index, 0] - 1, trajs[i, index, 1]-2), 2, 4, angle=90 + angle*180/np.pi, color=color, rotation_point='center', zorder=2)
                 ax.add_patch(rect)
             elif type[i] == "TYPE_PEDESTRIAN":
-                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.25), 1, 1, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.25), 0.5, 0.5, angle=90 + angle*180/np.pi, color='black', rotation_point='center')
                 ax.add_patch(rect)
             elif type[i] == "TYPE_CYCLIST":
-                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.5), 1, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
+                rect = Rectangle((trajs[i, index, 0] - 0.25, trajs[i, index, 1]-0.5), 0.5, 1, angle=90 + angle*180/np.pi, color='green', rotation_point='center')
                 ax.add_patch(rect)
 
             c = np.linspace(0.2, 1.0, first_zero)
@@ -99,12 +100,15 @@ def plot_frame(ax, data, frame):
     legend_elements = [Line2D([0], [0], color='gray', lw=2, label='white Road lines'),
                         Line2D([0], [0], color='yellow', lw=2, label='yellow Road lines'),
                         Line2D([0], [0], color='black', lw=2, label='Road edges'),
-                        Line2D([0], [0], color='lightgray', lw=2, label='Lanes'),]
+                        Line2D([0], [0], color='lightgray', lw=2, label='Lanes'),
+                        Line2D([0], [0], color='red', lw=2, label='GT trajectory', ls=':'),
+                        Line2D([0], [0], color='green', lw=2, label='Predicted trajectory', ls=':')]
+    
     return legend_elements
                                    
 
-def get_prediction():
-    return apply(filename)
+def get_prediction(checkpoint_path):
+    return apply(filename, checkpoint_path=checkpoint_path)
 
 def add_prediction_to_plot(ax, pred):
     for i in pred:
@@ -112,7 +116,7 @@ def add_prediction_to_plot(ax, pred):
         num_trajs = trajs.shape[0]
         for j in range(num_trajs):
             alpha = i["pred_scores"][j] # range : 0 to 1
-            plt.scatter(trajs[j, :, 0], trajs[j, :, 1], color="green", s=0.1, alpha=alpha, zorder=2, label="Prediction")
+            ax.scatter(trajs[j, :, 0], trajs[j, :, 1], color="green", s=0.1, alpha=alpha, zorder=2, label="Prediction")
 
     # add the gradient green as cmap
 
@@ -122,38 +126,58 @@ with open(file, 'rb') as f:
     print(data.keys())
     print(data["map_infos"].keys())
     print(data["map_infos"]["all_polylines"].shape)
-    print(data["map_infos"]["road_line"][0])
+    # print(data["map_infos"]["road_line"][0])
     # polyline is an array of N array of size 7
     # polyline : [x, y, z, dir_x, dir_y, dir_z, global_type]
 
-    fig, ax = plt.subplots()
+    # two subplots, side by side to compare the models
+    fig, ax = plt.subplots(1,2, figsize=(20, 10))
 
-    pred = get_prediction()
+    checkpoint_path = "../checkpoint_epoch_1.pth"
+    pred1 = get_prediction(checkpoint_path=checkpoint_path)
+    checkpoint_path2 = "../checkpoint_epoch_15.pth"
+    pred2 = get_prediction(checkpoint_path=checkpoint_path2)
 
     cmap = plt.cm.Greens
     norm = plt.Normalize(vmin=0, vmax=1)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
     sm.set_array([])
-    cbar = plt.colorbar(sm, ax=ax)
-    cbar.set_label('Prediction score')
+
+    print("model applied")
 
     def animate_func(j):
-        ax.clear()
-        legends = plot_frame(ax, data, j)
-        add_prediction_to_plot(ax, pred)
-        ax.legend(handles=legends, loc='upper right', bbox_to_anchor=(0.9, 0.9, 0.1, 0.1), fontsize='xx-small')
+        ax[0].clear()
+        ax[1].clear() 
+        cbar = plt.colorbar(sm, cax=ax[1].inset_axes([1.05, 0.1, 0.02, 0.8]))
+        cbar.set_label('Prediction score')
+        legends = plot_frame(ax[0], data, j)
+        add_prediction_to_plot(ax[0], pred1)
+        ax[0].set_title("1 epoch")
+        legends = plot_frame(ax[1], data, j)
+        add_prediction_to_plot(ax[1], pred2)
+        ax[1].set_title("15 epochs")
+        # ax[0].legend(handles=legends, loc='upper right', bbox_to_anchor=(0.9, 0.9, 0.1, 0.1), fontsize='xx-small')
+        ax[1].legend(handles=legends, loc='upper right', bbox_to_anchor=(0.9, 0.9, 0.1, 0.1), fontsize='xx-small')
 
     # animate the trajectories with rectangles    
     # the animation should last 8 seconds 
     interval = 1000/(data["track_infos"]["trajs"].shape[1] / 8)
+    # ax[0].set_aspect('equal')
+    ax[0].set_box_aspect(1)
+    # ax[1].set_aspect('equal')
+    ax[1].set_box_aspect(1)    
+    # hide the axis
+
+
     anim = FuncAnimation(fig, animate_func, frames=range(0, data["track_infos"]["trajs"].shape[1]), interval=interval)
-    # plot_frame(ax, data, 0)   
-    # add_prediction_to_plot(ax, pred) 
-    ax.set_aspect('equal')
-    ax.set_box_aspect(1)
+    # plot_frame(ax[0], data, 0)   
+    # plot_frame(ax[1], data, 0)
+    # add_prediction_to_plot(ax[0], pred1)
+    # add_prediction_to_plot(ax[1], pred2) 
+    plt.tight_layout()
   
-    # play the animation
-    anim.save('animation.gif', writer='pillow', fps=30, dpi=750)
+    # save the animation
+    anim.save(filename + '_animation_1_15.gif', writer='pillow', fps=20, dpi=350)
     
 
     # plt.show()
