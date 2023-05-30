@@ -105,3 +105,10 @@ python3 visualize.py --cfg_file MTR/tools/cfgs/waymo/dlav_with_dynamic_queries.y
 You may have to modify in the script:
 - the path to the model
 - the filename of the scene to visualize
+
+### Pre-trained models
+
+In our [latest release](https://github.com/tudoroancea/civil_459_project/releases/tag/MTR-pretrained)
+you can find the model weights for the two configurations we have used in our experiments:
+- `dlav_with_dynamic_queries.pth` -> `dlav_with_dynamic_queries.yaml`
+- `dlav_without_dynamic_queries.pth` -> `dlav_without_dynamic_queries.yaml`
