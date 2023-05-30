@@ -29,6 +29,6 @@ source $HOME/venvs/MTR/bin/activate
 
 # run test script
 # with dynamic queries
-# torchrun --nproc_per_node=1 --rdzv_endpoint=localhost:8080 MTR/tools/test.py --launcher pytorch --cfg_file MTR/tools/cfgs/waymo/dlav_with_dynamic_queries.yaml --extra_tag dlav_with_dynamic_queries --workers 1
+# torchrun --nproc_per_node=1 --rdzv_endpoint=localhost:$PORT MTR/tools/test.py --launcher pytorch --cfg_file MTR/tools/cfgs/waymo/dlav_with_dynamic_queries.yaml --extra_tag dlav_with_dynamic_queries --workers 1
 # without dynamic queries
-torchrun --nproc_per_node=1 --rdzv_endpoint=localhost:8080 MTR/tools/test.py --launcher pytorch --cfg_file MTR/tools/cfgs/waymo/dlav_without_dynamic_queries.yaml --extra_tag dlav_without_dynamic_queries --workers 1
+torchrun --nproc_per_node=1 --rdzv_endpoint=localhost:$PORT MTR/tools/test.py --launcher pytorch --cfg_file MTR/tools/cfgs/waymo/dlav_without_dynamic_queries.yaml --extra_tag dlav_without_dynamic_queries --workers 1
